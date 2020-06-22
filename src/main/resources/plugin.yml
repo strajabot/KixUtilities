@@ -1,0 +1,5 @@
+name: KixUtilities
+version: 0.1.0-SNAPSHOT
+main: me.kixstar.kixutilities.KixUtilities
+author: KixstarDevTeam
+api-version: '1.15'
