@@ -32,6 +32,15 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     compile 'io.papermc:paperlib:1.0.3'
     compile 'com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT'
+    compileOnly 'com.rabbitmq:amqp-client:5.9.0'
+}
+
+jar {
+    manifest {
+        attributes(
+                "Class-Path": "../lib/slf4j-api.jar ../lib/rabbitmq-client.jar"
+        )
+    }
 }
 
 apply plugin: "com.github.johnrengelman.shadow"

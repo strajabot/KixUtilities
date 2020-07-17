@@ -1,20 +1,26 @@
 package me.kixstar.kixutilities;
 
-import me.kixstar.kixutilities.feature.nickname.BungeeNicknameSync;
+import me.kixstar.kixutilities.feature.nickname.NicknameListener;
+import me.kixstar.kixutilities.feature.nickname.NicknameSynchronizer;
+import me.kixstar.kixutilities.rabbitmq.RabbitMQ;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class KixUtilities extends JavaPlugin {
     public void onEnable() {
 
-        BungeeNicknameSync bungeeNicknameSync = new BungeeNicknameSync();
-        getServer().getMessenger().registerIncomingPluginChannel(this, "kixutilities:nickname", bungeeNicknameSync);
-        getServer().getPluginManager().registerEvents(bungeeNicknameSync,this);
+        RabbitMQ.bind();
+
+        NicknameListener.getInstance().register(this);
 
     }
 
     public void onDisable() {
-        getServer().getMessenger().unregisterIncomingPluginChannel(this);
+
+        NicknameListener.getInstance().unregister();
+
+        RabbitMQ.unbind();
+
     }
 
     public static KixUtilities getInstance() {
