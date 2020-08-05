@@ -7,7 +7,8 @@ public abstract class ProtocolChannelDuplex extends ProtocolChannelInput {
 
     private String channel;
 
-    private ProtocolChannelDuplex(String channel) {
+    private ProtocolChannelDuplex(CustomProtocol protocol) {
+        super(protocol);
         this.channel = channel;
 
     }

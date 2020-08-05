@@ -31,7 +31,7 @@ repositories {
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.12'
     compile 'io.papermc:paperlib:1.0.3'
-    compile 'com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT'
+    compileOnly 'com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT'
     compileOnly 'com.rabbitmq:amqp-client:5.9.0'
 }
 
@@ -45,5 +45,5 @@ jar {
 
 apply plugin: "com.github.johnrengelman.shadow"
 shadowJar {
-    relocate 'io.papermc.lib', 'me.kixstar.eco.paperlib'
+    relocate 'io.papermc.lib', 'me.kixstar.kixutilities.paperlib'
 }

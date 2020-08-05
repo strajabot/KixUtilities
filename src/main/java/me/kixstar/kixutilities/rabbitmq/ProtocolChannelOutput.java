@@ -1,6 +1,7 @@
 package me.kixstar.kixutilities.rabbitmq;
 
 import com.rabbitmq.client.Channel;
+import me.kixstar.kixutilities.Config;
 
 import java.io.IOException;
 
@@ -12,10 +13,6 @@ public class ProtocolChannelOutput {
 
     private String exchange;
 
-    public ProtocolChannelOutput() {
-        this(new CustomProtocol());
-    }
-
     public ProtocolChannelOutput(CustomProtocol proto) {
         this.proto = proto;
     }
@@ -24,7 +21,7 @@ public class ProtocolChannelOutput {
         this.channel = channel;
         this.exchange = exchange;
         try {
-            this.channel.exchangeDeclare(this.exchange, type);
+            if (!this.exchange.equals("")) this.channel.exchangeDeclare(this.exchange, type);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -32,7 +29,7 @@ public class ProtocolChannelOutput {
 
     public void unbind() {
         try {
-            this.channel.exchangeDelete(this.exchange, false);
+            if (!this.exchange.equals("")) this.channel.exchangeDelete(this.exchange, true);
             this.channel = null;
             this.exchange = null;
 
@@ -43,10 +40,33 @@ public class ProtocolChannelOutput {
 
     public void sendPacket(Packet packet, String route) {
         try {
-            channel.basicPublish(exchange, route, packet.getProperties(), proto.serailize(packet));
+            if (!RabbitMQ.setOrigin(packet))
+                throw new RuntimeException("Couldn't set packet's \"origin\" header, packet will be ignored");
+            channel.basicPublish(exchange, route, packet.getProperties(), proto.serialize(packet));
+
+            //logs all outgoing RabbitMQ packets if the plugin isn't running in production
+            if (!Config.isProd()) this.log(packet, route);
+
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private void log(Packet packet, String route) {
+        String log = new StringBuilder()
+                .append(RabbitMQ.getOrigin())
+                .append("->")
+                .append(this.exchange.equals("") ? "default" : this.exchange)
+                .append(".")
+                .append(route)
+                .append(":")
+                .append(packet.toString())
+                .append("correlationID:")
+                .append(packet.getProperties().getCorrelationId())
+                .append("\n")
+                .toString();
+
+        System.out.println(log);
     }
 
     public CustomProtocol getProto() {

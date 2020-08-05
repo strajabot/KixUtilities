@@ -36,26 +36,21 @@ public class CustomProtocol {
         frame.readFully(raw);
 
         Class<? extends Packet> pClass = this.packets.get(identifier);
+        if (pClass == null) return null;
 
         try {
             Packet packet = pClass.getConstructor().newInstance();
             packet.deserialize(raw);
 
             return packet;
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
+        } catch (NoSuchMethodException | IllegalAccessException | InstantiationException | InvocationTargetException e) {
             e.printStackTrace();
         }
 
         return null;
     }
 
-    public byte[] serailize(Packet packet) {
+    public byte[] serialize(Packet packet) {
         if (!this.packets.containsValue(packet.getClass())) return null;
         ByteArrayDataOutput frame = ByteStreams.newDataOutput();
 

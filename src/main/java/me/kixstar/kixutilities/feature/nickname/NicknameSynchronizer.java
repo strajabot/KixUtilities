@@ -1,7 +1,6 @@
 package me.kixstar.kixutilities.feature.nickname;
 
 import me.kixstar.kixutilities.KixUtilities;
-import me.kixstar.kixutilities.KixstarDB;
 import me.kixstar.kixutilities.rabbitmq.Packet;
 import me.kixstar.kixutilities.rabbitmq.ProtocolChannelInput;
 import me.kixstar.kixutilities.rabbitmq.RabbitMQ;
@@ -9,8 +8,6 @@ import me.kixstar.kixutilities.rabbitmq.nickname.NicknameChangePacket;
 import me.kixstar.kixutilities.rabbitmq.nickname.NicknameClearPacket;
 import me.kixstar.kixutilities.rabbitmq.nickname.NicknameProtocol;
 import org.bukkit.entity.Player;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import java.util.UUID;
