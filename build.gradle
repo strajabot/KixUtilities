@@ -33,11 +33,15 @@ dependencies {
     compile 'io.papermc:paperlib:1.0.3'
     compileOnly 'com.destroystokyo.paper:paper-api:1.15.2-R0.1-SNAPSHOT'
     compileOnly 'com.rabbitmq:amqp-client:5.9.0'
+    compileOnly 'net.luckperms:api:5.0'
+    compileOnly 'org.mongodb:mongodb-driver-sync:4.1.0'
+    compileOnly 'org.jetbrains:annotations:16.0.1'
 }
 
 jar {
     manifest {
         attributes(
+                //todo: add mongodb driver to classpath
                 "Class-Path": "../lib/slf4j-api.jar ../lib/rabbitmq-client.jar"
         )
     }

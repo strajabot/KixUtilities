@@ -2,6 +2,7 @@ package me.kixstar.kixutilities.feature.teleport;
 
 import com.rabbitmq.client.AMQP;
 import me.kixstar.kixutilities.KixUtilities;
+import me.kixstar.kixutilities.Location;
 import me.kixstar.kixutilities.rabbitmq.*;
 import me.kixstar.kixutilities.rabbitmq.teleport.*;
 import org.bukkit.World;
