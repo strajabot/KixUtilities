@@ -1,19 +1,25 @@
 package me.kixstar.kixutilities.commands;
 
+import com.google.common.base.Preconditions;
 import me.kixstar.kixutilities.Config;
 import me.kixstar.kixutilities.KixUtilities;
-import me.kixstar.kixutilities.Location;
-import me.kixstar.kixutilities.feature.home.HomeService;
+import me.kixstar.kixutilities.database.abstraction.HomeSlotsMaxedException;
+import me.kixstar.kixutilities.database.abstraction.player.KixPlayer;
+import me.kixstar.kixutilities.database.entities.Location;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.TextComponent;
-import org.apache.commons.lang.Validate;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 /**
@@ -48,18 +54,20 @@ public class SethomeCommand extends Command {
             return false;
         }
         Player player = (Player) sender;
+
+        boolean isSuccessful = false;
         if (args.length == 0) {
             /* "/sethome" */
-            this.selfSetHome(player, "default");
+            isSuccessful = this.selfSetHome(player, "default");
         } else if (args.length == 1) {
             /* "/sethome <homeName>" */
-            this.selfSetHome(player, args[0]);
+            isSuccessful = this.selfSetHome(player, args[0]);
         } else if (args.length == 2) {
             /* "/sethome <playerName> <homeName>" */
-            this.targetSetHome(player, args[0], args[1]);
+            isSuccessful = this.targetSetHome(player, args[0], args[1]);
         }
 
-        return true;
+        return isSuccessful;
     }
 
     /**
@@ -74,12 +82,22 @@ public class SethomeCommand extends Command {
      * @param homeName the name of the home that is being set
      * @return
      */
-    public boolean selfSetHome(@NotNull Player player, @NotNull String homeName) {
-        if (!player.hasPermission("kix.utilities.home.self.set")) {
+    private boolean selfSetHome(@NotNull Player player, @NotNull String homeName) {
+        if(!player.hasPermission("kix.utilities.home.self.set")) {
             this.noPermission(player);
             return false;
         }
-        HomeService.setHome(player.getUniqueId().toString(), homeName, this.getLocation(player));
+        //we reuse the username validation to disallow nonsensical home names.
+        if(!KixPlayer.validUsername(homeName)) {
+            this.invalidHomeName(player, homeName);
+            return false;
+        }
+        KixPlayer.get(player.getUniqueId().toString()).setHome(homeName, this.getLocation(player));
+
+        TextComponent sucessfulMessage = new TextComponent("Home \"" + homeName +"\" successfully set");
+        sucessfulMessage.setColor(ChatColor.GREEN);
+        player.sendMessage(sucessfulMessage);
+
         return true;
     }
 
@@ -90,57 +108,150 @@ public class SethomeCommand extends Command {
      * This method returns false if :
      *  1. The player doesn't have the permission "kix.utilities.home.target.set".
      *      (also sends the player a message saying that he doesn't have permissions to run this command)
-     *  2. The target player isn't online.
-     *      (also sends the player a message saying that the target player isn't online).
      * otherwise it returns true.
      *
      * @param player player who sent the command
      * @param targetName name of the target player
      * @param homeName the name of the home that is being set
-     * @return
+     * @return true if home setting was successful
      */
     private boolean targetSetHome(@NotNull Player player, @NotNull String targetName, @NotNull String homeName) {
-        Validate.notNull(player, "Argument \"player\" can't be null");
-        Validate.notNull(targetName, "Argument \"targetName\" can't be null");
-        Validate.notNull(homeName, "Argument \"homeName\" can't be null");
-        Player target = Bukkit.getServer().getPlayer(targetName);
+        Preconditions.checkNotNull(player, "Argument \"player\" can't be null");
+        Preconditions.checkNotNull(targetName, "Argument \"targetName\" can't be null");
+        Preconditions.checkNotNull(homeName, "Argument \"homeName\" can't be null");
         if(!player.hasPermission("kix.utilities.home.target.set")) {
             noPermission(player);
             return false;
         }
-        if(target == null) {
-            targetOffline(player, targetName);
+        //we reuse the username validation to disallow nonsensical home names.
+        if(!KixPlayer.validUsername(homeName)) {
+            invalidHomeName(player, homeName);
             return false;
         }
-        HomeService.setHome(target.getUniqueId().toString(), homeName, this.getLocation(player));
+        //we reuse the username validation to disallow nonsensical home names.
+        if(!KixPlayer.validUsername(targetName)) {
+            invalidUsername(player, targetName);
+            return false;
+        }
+        //todo: fix not knowing if a player with that username exists
+        OfflinePlayer target = Bukkit.getServer().getOfflinePlayer(targetName);
+        KixPlayer targetKixPlayer = KixPlayer.get(target.getUniqueId().toString());
+        CompletableFuture<Void> setHomeFuture = targetKixPlayer.setHome(homeName, this.getLocation(player));
+
+        setHomeFuture.whenComplete((ignore, ex) -> {
+           if(ex == null) {
+               TextComponent successfulMessage = new TextComponent("Home \"" + targetName + ":" +homeName +"\" successfully set");
+               successfulMessage.setColor(ChatColor.GREEN);
+               player.sendMessage(successfulMessage);
+           } else if(ex instanceof HomeSlotsMaxedException) {
+               TextComponent slotsMaxedMessage = new TextComponent("Can't set " + targetName+ "'s home since he doesn't have any empty slots");
+               slotsMaxedMessage.setColor(ChatColor.RED);
+               TextComponent deleteOrOverwriteMessage = new TextComponent("You can either free some slots using /delhome or overwrite existing slots");
+               deleteOrOverwriteMessage.setColor(ChatColor.RED);
+               player.sendMessage(slotsMaxedMessage);
+               player.sendMessage(deleteOrOverwriteMessage);
+           } else {
+               unexpectedError(player, targetName, homeName, ex);
+           }
+        });
+
+        //being optimistic that the database request will complete correctly.
         return true;
     }
 
-    public void log(@NotNull Level level, @NotNull String string) {
-        Validate.notNull(level, "Argument \"level\" can't be null");
-        Validate.notNull(string, "Argument \"string\" can't be null");
+    private void log(@NotNull Level level, @NotNull String string) {
+        Preconditions.checkNotNull(level, "Argument \"level\" can't be null");
+        Preconditions.checkNotNull(string, "Argument \"string\" can't be null");
         Plugin plugin = KixUtilities.getInstance();
         plugin.getLogger().log(level, string);
     }
 
-    private void targetOffline(@NotNull Player player, @NotNull String targetName) {
-        Validate.notNull(player, "Argument \"player\" can't be null");
-        Validate.notNull(targetName, "Argument \"targetName\" can't be null");
-        TextComponent targetOffline = new TextComponent("The player " + targetName + " isn't online, so his homes can't be set");
-        targetOffline.setColor(ChatColor.RED);
-        player.sendMessage(targetOffline);
-    }
-
     private void noPermission(@NotNull Player player) {
-        Validate.notNull(player, "Argument \"player\" can't be null");
+        Preconditions.checkNotNull(player, "Argument \"player\" can't be null");
         TextComponent noPermission = new TextComponent("You don't have permissions needed to run this command");
         noPermission.setColor(ChatColor.RED);
         player.sendMessage(noPermission);
     }
 
+    private void invalidHomeName(@NotNull Player player, @NotNull String homeName) {
+        Preconditions.checkNotNull(player, "Argument \"player\" can't be null");
+        Preconditions.checkNotNull(homeName, "Argument \"homeName\" can't be null");
+        TextComponent invalidHomeName = new TextComponent("\"" + homeName + "\" isn't a valid home name\n");
+        invalidHomeName.setColor(ChatColor.RED);
+        String[] homeNameCriteria = new String[]{
+                ChatColor.RED + "Home names can contain all letters of the English Alphabet",
+                ChatColor.RED + "Home names can contain all digits",
+                ChatColor.RED + "Home names can contain underscores",
+                ChatColor.RED + "Home names mustn't be shorter than 3 characters",
+                ChatColor.RED + "Home names mustn't be longer than 16 characters"
+        };
+        player.sendMessage(invalidHomeName);
+        player.sendMessage(homeNameCriteria);
+    }
+
+    private void invalidUsername(@NotNull Player player, @NotNull String username) {
+        Preconditions.checkNotNull(player, "Argument \"player\" can't be null");
+        Preconditions.checkNotNull(username, "Argument \"username\" can't be null");
+        TextComponent invalidHomeName = new TextComponent("\"" + username + "\" isn't a valid username\n");
+        invalidHomeName.setColor(ChatColor.RED);
+        String[] homeNameCriteria = new String[]{
+                ChatColor.RED + "Username can contain all letters of the English Alphabet",
+                ChatColor.RED + "Username can contain all digits",
+                ChatColor.RED + "Username can contain underscores",
+                ChatColor.RED + "Username mustn't be shorter than 3 characters",
+                ChatColor.RED + "Username mustn't be longer than 16 characters"
+        };
+        player.sendMessage(invalidHomeName);
+        player.sendMessage(homeNameCriteria);
+    }
+
+    private void unexpectedError(
+            @NotNull Player player,
+            @NotNull String targetName,
+            @NotNull String homeName,
+            @NotNull Throwable throwable
+    ) {
+        Preconditions.checkNotNull(player, "Argument \"player\" can't be null");
+        Preconditions.checkNotNull(targetName, "Argument \"targetName\" can't be null");
+        Preconditions.checkNotNull(homeName, "Argument \"homeName\" can't be null");
+        Preconditions.checkNotNull(throwable, "Argument \"throwable\" can't be null");
+
+        String formattedStackTrace = getFormattedTrace(throwable);
+
+        TextComponent stackTrace = new TextComponent();
+        stackTrace.setText(formattedStackTrace);
+        stackTrace.setColor(ChatColor.RED);
+        TextComponent errMessage = new TextComponent();
+        errMessage.setText("Couldn't set home " + targetName + ":" + homeName + " because of an internal error:\n");
+        errMessage.setColor(ChatColor.RED);
+        errMessage.addExtra(stackTrace);
+        errMessage.addExtra("\nPlease report to staff as soon as possible");
+
+        this.log(Level.SEVERE, errMessage.toString());
+
+        player.sendMessage(errMessage);
+    }
+
+    @NotNull
+    private String getFormattedTrace(@NotNull Throwable throwable) {
+        Preconditions.checkNotNull(throwable, "Argument \"throwable\" can't be null");
+        Writer stringWriter = new StringWriter();
+        throwable.printStackTrace(new PrintWriter(stringWriter));
+        return stringWriter.toString();
+    }
+
     @NotNull
     private Location getLocation(@NotNull Player player) {
-        return Location.convertLocation(player.getLocation(), Config.getServerHandle());
+        org.bukkit.Location playerLocation = player.getLocation();
+        return new Location(
+                Config.getServerHandle(),
+                playerLocation.getWorld().getName(),
+                playerLocation.getX(),
+                playerLocation.getY(),
+                playerLocation.getZ(),
+                playerLocation.getYaw(),
+                playerLocation.getPitch()
+        );
     }
 
 }

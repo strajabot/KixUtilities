@@ -2,7 +2,7 @@ package me.kixstar.kixutilities.feature.teleport;
 
 import com.rabbitmq.client.AMQP;
 import me.kixstar.kixutilities.KixUtilities;
-import me.kixstar.kixutilities.Location;
+import me.kixstar.kixutilities.database.entities.Location;
 import me.kixstar.kixutilities.rabbitmq.*;
 import me.kixstar.kixutilities.rabbitmq.teleport.*;
 import org.bukkit.World;
@@ -95,7 +95,15 @@ public class TeleportTransaction implements Listener {
             this.targetUUID = null;
             this.teleportOutbound = (getPlayer(playerUUID) != null);
             this.teleportInbound = RabbitMQ.getOrigin().equals(packet.getServerName());
-            this.targetLocation = new Location(packet);
+            this.targetLocation = new Location(
+                    packet.getServerName(),
+                    packet.getWorldName(),
+                    packet.getX(),
+                    packet.getY(),
+                    packet.getZ(),
+                    packet.getYaw(),
+                    packet.getPitch()
+            );
 
             this.sendConfirmResponse(packet);
             if (this.teleportOutbound) TeleportService.get().addWatchMove(getPlayer(this.playerUUID), this);
@@ -164,8 +172,8 @@ public class TeleportTransaction implements Listener {
                         this.targetLocation.getX(),
                         this.targetLocation.getY(),
                         this.targetLocation.getZ(),
-                        this.targetLocation.getYaw(),
-                        this.targetLocation.getPitch()
+                        (float) this.targetLocation.getYaw(),
+                        (float) this.targetLocation.getPitch()
                 );
             }
         } finally {

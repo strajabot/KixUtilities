@@ -1,6 +1,7 @@
 package me.kixstar.kixutilities;
 
 import me.kixstar.kixutilities.commands.SethomeCommand;
+import me.kixstar.kixutilities.database.Database;
 import me.kixstar.kixutilities.feature.nickname.NicknameListener;
 import me.kixstar.kixutilities.feature.servercommand.ServerCommandListener;
 import me.kixstar.kixutilities.feature.teleport.TeleportService;
@@ -27,6 +28,7 @@ public class KixUtilities extends JavaPlugin {
         Validate.notNull(luckPermsRSP, "This plugin depends on LuckPerms to run");
 
         RabbitMQ.bind(Config.getServerHandle());
+        Database.bind();
 
         NicknameListener.getInstance().register(this);
         ServerCommandListener.register();
